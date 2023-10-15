@@ -5,6 +5,7 @@ const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const User = require("./userSchema.js");
+const Post = require("./postSchema.js");  
 const session = require("express-session");
 const passport = require("passport");
 const app = express();
@@ -167,13 +168,39 @@ app.post("/register", (req, res) => {
 });
 
 // SECRET ROUTE
-app.get("/secrets", (req, res) => {
+app.get("/secrets", async (req, res) => {
   if (req.isAuthenticated()) {
-    res.render("secrets");
+    const findPosts = await Post.find({});
+    res.render("secrets", { posts: findPosts});
   } else {
     res.redirect("/login");
   }
 });
+
+// SUBMIT ROUTE
+
+app.get("/submit", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.render("submit");
+  } else {
+    res.redirect("/login");
+  }
+});
+
+app.post("/submit", async (req, res) => {
+  const secret = req.body.secret;
+  const userCheck = User.findById(req.user.id)
+  if(userCheck){
+    const newPost = await Post.create({
+      secret: secret,
+    });
+    res.redirect("/secrets");
+  } else {
+    res.redirect("/login");
+  }
+});
+      
+
 app.listen(port, () => {
   console.log(`App is listening to port ${port}`);
 });
