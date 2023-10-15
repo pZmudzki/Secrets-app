@@ -1,13 +1,25 @@
 //jshint esversion:6
-
+require("dotenv").config();
 const express = require("express");
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const User = require("./userSchema.js");
-
+const session = require("express-session");
+const passport = require("passport");
 const app = express();
 const port = 3000;
+
+app.use(
+  session({
+    secret: SECRET,
+    resave: false,
+    saveUninitialized: false,
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 mongoose.connect("mongodb://127.0.0.1:27017/usersDB");
 
@@ -19,83 +31,80 @@ app.use(
   })
 );
 
+passport.use(User.createStrategy());
+
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
 // ROOT ROUTE
 app.get("/", (req, res) => {
-  try {
-    res.render("home");
-  } catch (e) {
-    console.log(e);
-  }
+  res.render("home");
 });
 
 // LOGIN ROUTE
 app.get("/login", (req, res) => {
-  try {
-    res.render("login");
-  } catch (e) {
-    console.log(e);
-  }
+  res.render("login");
 });
 
-app.post("/login", async (req, res) => {
-  try {
-    const username = req.body.username;
-    const password = req.body.password;
+app.post("/login", (req, res) => {
+  const user = new User({
+    username: req.body.username,
+    password: req.body.password,
+  });
 
-    // const checkUser = await User.exists({
-    //   email: username,
-    //   password: password,
-    // });
-
-    // if (checkUser) {
-    //   res.render("secrets");
-    // } else {
-    //   res.send("Email or password is incorrect");
-    // }
-    const checkUser = await User.findOne({ email: username });
-    if (checkUser) {
-      if (checkUser.password === password) {
-        res.render("secrets");
-      } else {
-        res.send("Email or password is incorrect");
-      }
+  req.login(user, function (err) {
+    if (err) {
+      console.log(err);
     } else {
-      res.send("Email or password is incorrect");
+      passport.authenticate("local")(req, res, function () {
+        res.redirect("/secrets");
+      });
     }
-  } catch (e) {
-    console.log(e);
-  }
+  });
+});
+
+// LOGOUT ROUTE
+
+app.get("/logout", (req, res) => {
+  req.logout(function (err) {
+    if (err) {
+      console.log(err);
+    } else {
+      res.redirect("/");
+    }
+  });
 });
 
 //REGISTER ROUTE
 app.get("/register", (req, res) => {
-  try {
-    res.render("register");
-  } catch (e) {
-    console.log(e);
-  }
+  res.render("register");
 });
 
-app.post("/register", async (req, res) => {
-  try {
-    // const checkUser = await User.find({ email: req.body.username });
-    // if (checkUser) return;
-    // console.log(req.body);
-    const checkUser = await User.findOne({ email: req.body.username });
-    if (!checkUser) {
-      const newUser = await User.create({
-        email: req.body.username,
-        password: req.body.password,
-      });
-      res.render("secrets");
-    } else {
-      res.send("User already exists");
+app.post("/register", (req, res) => {
+  User.register(
+    { username: req.body.username, active: false },
+    req.body.password,
+    function (err, user) {
+      if (err) {
+        console.log(err);
+        res.redirect("/register");
+      } else {
+        passport.authenticate("local")(req, res, function () {
+          res.redirect("/secrets");
+        });
+      }
     }
-  } catch (e) {
-    console.log(e);
-  }
+  );
 });
 
+// SECRET ROUTE
+app.get("/secrets", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.render("secrets");
+  } else {
+    res.redirect("/login");
+  }
+});
 app.listen(port, () => {
   console.log(`App is listening to port ${port}`);
 });
