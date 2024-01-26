@@ -5,7 +5,7 @@ const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const User = require("./userSchema.js");
-const Post = require("./postSchema.js");  
+const Post = require("./postSchema.js");
 const session = require("express-session");
 const passport = require("passport");
 const app = express();
@@ -24,7 +24,7 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-mongoose.connect("mongodb://127.0.0.1:27017/usersDB");
+mongoose.connect(process.env.MONGO_CLIENT);
 
 app.use(express.static("public"));
 app.set("view engine", "ejs");
@@ -66,17 +66,20 @@ passport.use(
 );
 
 // FACEBOOK AUTHENTICATION
-passport.use(new FacebookStrategy({
-  clientID: process.env.FACEBOOK_APP_ID,
-  clientSecret: process.env.FACEBOOK_APP_SECRET,
-  callbackURL: "http://localhost:3000/auth/facebook/secrets"
-},
-function(accessToken, refreshToken, profile, cb) {
-  User.findOrCreate({ facebookId: profile.id }, function (err, user) {
-    return cb(err, user);
-  });
-}
-));
+passport.use(
+  new FacebookStrategy(
+    {
+      clientID: process.env.FACEBOOK_APP_ID,
+      clientSecret: process.env.FACEBOOK_APP_SECRET,
+      callbackURL: "http://localhost:3000/auth/facebook/secrets",
+    },
+    function (accessToken, refreshToken, profile, cb) {
+      User.findOrCreate({ facebookId: profile.id }, function (err, user) {
+        return cb(err, user);
+      });
+    }
+  )
+);
 
 // ROOT ROUTE
 app.get("/", (req, res) => {
@@ -101,15 +104,19 @@ app.get(
 
 // FACEBOOK ROUTE
 
-app.get('/auth/facebook',
-  passport.authenticate("facebook", { scope: 'public_profile'}));
+app.get(
+  "/auth/facebook",
+  passport.authenticate("facebook", { scope: "public_profile" })
+);
 
-app.get('/auth/facebook/secrets',
-  passport.authenticate('facebook', { failureRedirect: '/login' }),
-  function(req, res) {
+app.get(
+  "/auth/facebook/secrets",
+  passport.authenticate("facebook", { failureRedirect: "/login" }),
+  function (req, res) {
     // Successful authentication, redirect home.
-    res.redirect('/secrets');
-  });
+    res.redirect("/secrets");
+  }
+);
 
 // LOGIN ROUTE
 app.get("/login", (req, res) => {
@@ -171,7 +178,7 @@ app.post("/register", (req, res) => {
 app.get("/secrets", async (req, res) => {
   if (req.isAuthenticated()) {
     const findPosts = await Post.find({});
-    res.render("secrets", { posts: findPosts});
+    res.render("secrets", { posts: findPosts });
   } else {
     res.redirect("/login");
   }
@@ -189,8 +196,8 @@ app.get("/submit", (req, res) => {
 
 app.post("/submit", async (req, res) => {
   const secret = req.body.secret;
-  const userCheck = User.findById(req.user.id)
-  if(userCheck){
+  const userCheck = User.findById(req.user.id);
+  if (userCheck) {
     const newPost = await Post.create({
       secret: secret,
     });
@@ -199,7 +206,6 @@ app.post("/submit", async (req, res) => {
     res.redirect("/login");
   }
 });
-      
 
 app.listen(port, () => {
   console.log(`App is listening to port ${port}`);
